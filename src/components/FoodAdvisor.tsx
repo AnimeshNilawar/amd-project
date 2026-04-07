@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
-import { Camera, Image as ImageIcon, Send, Target, X } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight, Image as ImageIcon, Send, Target, X } from 'lucide-react';
 import { FoodAnalysis } from '../lib/parseResponse';
 import AnalysisResult from './AnalysisResult';
 
@@ -14,6 +14,66 @@ const GOALS = [
 
 const EXAMPLES = ['A slice of pepperoni pizza', 'A bowl of quinoa salad', 'Double cheeseburger'];
 
+type NutritionTip = {
+  eyebrow: string;
+  title: string;
+  body: string;
+};
+
+const NUTRITION_TIPS: Record<string, NutritionTip[]> = {
+  'Weight Loss': [
+    {
+      eyebrow: 'Satiety first',
+      title: 'Prioritize protein and fiber',
+      body: 'These help you feel full longer, which makes calorie control easier without feeling deprived.',
+    },
+    {
+      eyebrow: 'Better cooking methods',
+      title: 'Choose grilled, baked, or steamed foods',
+      body: 'These usually keep calories lower than fried versions while still feeling satisfying.',
+    },
+    {
+      eyebrow: 'Hidden calories',
+      title: 'Watch drinks and sauces',
+      body: 'Sugary beverages, creamy sauces, and extras can silently raise the total calorie load.',
+    },
+  ],
+  'Muscle Gain': [
+    {
+      eyebrow: 'Recovery fuel',
+      title: 'Pair carbs with lean protein',
+      body: 'That combination supports training recovery and helps you build meals that actually move the needle.',
+    },
+    {
+      eyebrow: 'Calorie quality',
+      title: 'Add nutrient-dense extras',
+      body: 'Nuts, avocado, olive oil, and whole grains raise calories without making the meal junk-heavy.',
+    },
+    {
+      eyebrow: 'Consistency',
+      title: 'Eat enough total energy',
+      body: 'Muscle gain stalls when intake is too low, even if the food choices look healthy on paper.',
+    },
+  ],
+  'General Health': [
+    {
+      eyebrow: 'Balanced plate',
+      title: 'Build around whole foods',
+      body: 'Vegetables, whole grains, and lean protein create a strong baseline for everyday nutrition.',
+    },
+    {
+      eyebrow: 'Practical mindset',
+      title: 'Aim for balance, not perfection',
+      body: 'One food rarely defines a full day. The goal is consistently decent choices over time.',
+    },
+    {
+      eyebrow: 'Long-term health',
+      title: 'Choose less processed foods when possible',
+      body: 'Less processing usually means better fiber, better micronutrients, and easier portion control.',
+    },
+  ],
+};
+
 type AnalyzeResponse = {
   analysis: FoodAnalysis;
   fallbackUsed: boolean;
@@ -24,12 +84,26 @@ export default function FoodAdvisor() {
   const [textInput, setTextInput] = useState('');
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [selectedGoal, setSelectedGoal] = useState(GOALS[0].label);
+  const [tipIndex, setTipIndex] = useState(0);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FoodAnalysis | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const tips = NUTRITION_TIPS[selectedGoal] ?? NUTRITION_TIPS['General Health'];
+
+  useEffect(() => {
+    setTipIndex(0);
+  }, [selectedGoal]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setTipIndex((currentIndex) => (currentIndex + 1) % tips.length);
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [tips.length]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -200,6 +274,72 @@ export default function FoodAdvisor() {
               )}
             </button>
           </form>
+
+          <div className="glass-panel rounded-2xl p-5 border border-white/10 overflow-hidden relative">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-brand-300/80 font-semibold">Nutrition Tips</p>
+                <h3 className="text-lg font-semibold text-white">Quick guidance for {selectedGoal.toLowerCase()}</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">
+                  {tipIndex + 1}/{tips.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTipIndex((currentIndex) => (currentIndex - 1 + tips.length) % tips.length)}
+                  className="p-2 rounded-full bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Previous nutrition tip"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipIndex((currentIndex) => (currentIndex + 1) % tips.length)}
+                  className="p-2 rounded-full bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Next nutrition tip"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-black/20">
+              <div
+                className="flex transition-transform duration-500 ease-out"
+                style={{ transform: `translateX(-${tipIndex * 100}%)` }}
+              >
+                {tips.map((tip) => (
+                  <div key={tip.title} className="w-full shrink-0 p-5 md:p-6 min-h-[170px] flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <span className="inline-flex w-fit items-center rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-200">
+                        {tip.eyebrow}
+                      </span>
+                      <h4 className="text-xl md:text-2xl font-semibold text-white leading-tight">
+                        {tip.title}
+                      </h4>
+                      <p className="text-sm md:text-base leading-relaxed text-gray-300 max-w-2xl">
+                        {tip.body}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center gap-2">
+              {tips.map((tip, index) => (
+                <button
+                  key={tip.title}
+                  type="button"
+                  onClick={() => setTipIndex(index)}
+                  className={`h-2.5 rounded-full transition-all duration-300 ${index === tipIndex ? 'w-8 bg-brand-500' : 'w-2.5 bg-white/20 hover:bg-white/35'}`}
+                  aria-label={`Show tip ${index + 1}`}
+                  aria-pressed={index === tipIndex}
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Output Results Area */}
