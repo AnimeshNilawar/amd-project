@@ -1,6 +1,8 @@
 # Smart Food Advisor
 
-Smart Food Advisor is a client-side Next.js application that analyzes a food name or food image and returns an AI-generated health assessment in real time. It uses Google Gemini for structured food understanding, then presents the result in a clean, demo-friendly interface with health scoring, macronutrient bars, and goal-aware advice.
+Smart Food Advisor is a Next.js application that analyzes a food name or food image and returns an AI-generated health assessment in real time. It uses a server-side Gemini API route for structured food understanding, then presents the result in a clean, demo-friendly interface with health scoring, macronutrient bars, and goal-aware advice.
+
+The current deployment model is server-side for the Gemini request, which makes it safe to run on Cloud Run or any standard Node.js host without exposing the API key to the browser.
 
 ## Live Experience
 
@@ -56,9 +58,11 @@ The app lets the user choose one of three goals:
 
 That goal is passed into the Gemini prompt so the response is contextual, not generic.
 
-### 3. Gemini is called directly from the client
+### 3. Gemini is called from a server API route
 
-The request is sent from the browser to Gemini using the `NEXT_PUBLIC_GEMINI_API_KEY` environment variable.
+The browser sends the food input to `POST /api/analyze`.
+
+That route runs on the server, reads `GEMINI_API_KEY` from the runtime environment, calls Gemini, validates the JSON response, and returns the structured analysis back to the client.
 
 The prompt instructs Gemini to return strict JSON containing:
 
@@ -124,10 +128,10 @@ copy .env.example .env.local
 Then set the key:
 
 ```env
-NEXT_PUBLIC_GEMINI_API_KEY=your_actual_api_key_here
+GEMINI_API_KEY=your_actual_api_key_here
 ```
 
-> Important: because this is a client-side only demo, any key in `NEXT_PUBLIC_*` is exposed in the browser at runtime. That is acceptable for a hackathon MVP, but it is not appropriate for a production app.
+> Important: the app now keeps the Gemini key on the server. Do not use `NEXT_PUBLIC_` for this secret.
 
 ### 3. Run the app
 
@@ -148,18 +152,18 @@ Open the local app in your browser and try a food name or upload a photo.
 
 The project includes a multistage Dockerfile for building a small production image.
 
-Because the app uses `NEXT_PUBLIC_GEMINI_API_KEY`, the key must be available at build time so Next.js can inline it into the client bundle.
+Because the Gemini call happens on the server, the key can be provided as a runtime environment variable.
 
 ### Build the image
 
 ```bash
-docker build --build-arg NEXT_PUBLIC_GEMINI_API_KEY=your_actual_api_key_here -t smart-food-advisor .
+docker build -t smart-food-advisor .
 ```
 
 ### Run the container
 
 ```bash
-docker run -p 3000:3000 smart-food-advisor
+docker run -p 3000:3000 -e GEMINI_API_KEY=your_actual_api_key_here smart-food-advisor
 ```
 
 Then open [http://localhost:3000](http://localhost:3000).
@@ -188,9 +192,9 @@ The UI is intentionally high-contrast and cinematic so it reads well in a live d
 
 ## Security Note
 
-This project is designed as a rapid prototype. It does not include a backend proxy, auth, or database.
+The app now uses a server-side API route for Gemini requests, which is the correct pattern for Cloud Run and other production-style deployments.
 
-For a production version, the Gemini request should be proxied through a server so the API key is never exposed in the browser.
+It still does not include auth or a database, because the goal is a fast demo MVP.
 
 ## Why This Project Works Well in a Hackathon
 

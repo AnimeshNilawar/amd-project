@@ -1,3 +1,5 @@
+import "server-only";
+
 type GeminiInlineDataPart = {
   inline_data: {
     mime_type: string;
@@ -22,11 +24,16 @@ type GeminiResponse = {
 };
 
 export async function analyzeFoodWithGemini(
-  apiKey: string,
   goal: string,
   textInput: string,
   imageBase64: string | null = null
 ): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Missing GEMINI_API_KEY on the server.');
+  }
+
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
 
   const prompt = `

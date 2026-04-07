@@ -3,8 +3,7 @@
 import React, { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Camera, Image as ImageIcon, Send, Target, X } from 'lucide-react';
-import { analyzeFoodWithGemini } from '../lib/geminiClient';
-import { parseResponse, FoodAnalysis, getFallbackAnalysis } from '../lib/parseResponse';
+import { FoodAnalysis } from '../lib/parseResponse';
 import AnalysisResult from './AnalysisResult';
 
 const GOALS = [
@@ -14,6 +13,12 @@ const GOALS = [
 ];
 
 const EXAMPLES = ['A slice of pepperoni pizza', 'A bowl of quinoa salad', 'Double cheeseburger'];
+
+type AnalyzeResponse = {
+  analysis: FoodAnalysis;
+  fallbackUsed: boolean;
+  message?: string;
+};
 
 export default function FoodAdvisor() {
   const [textInput, setTextInput] = useState('');
@@ -25,7 +30,6 @@ export default function FoodAdvisor() {
   const [result, setResult] = useState<FoodAnalysis | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY ?? '';
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,11 +64,6 @@ export default function FoodAdvisor() {
     setError(null);
     setResult(null);
 
-    if (!geminiApiKey.trim()) {
-      setError('Missing NEXT_PUBLIC_GEMINI_API_KEY. Add it to your .env.local file and restart the dev server.');
-      return;
-    }
-
     if (!textInput.trim() && !imageBase64) {
       setError('Please provide a food name or upload an image.');
       return;
@@ -73,14 +72,29 @@ export default function FoodAdvisor() {
     setLoading(true);
 
     try {
-      const rawOutput = await analyzeFoodWithGemini(geminiApiKey, selectedGoal, textInput, imageBase64);
-      const parsedData = parseResponse(rawOutput);
-      setResult(parsedData);
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          goal: selectedGoal,
+          textInput,
+          imageBase64,
+        }),
+      });
+
+      const data = (await response.json()) as AnalyzeResponse | { message?: string };
+
+      if (!response.ok || !('analysis' in data)) {
+        throw new Error(data.message || 'Unable to analyze food.');
+      }
+
+      setResult(data.analysis);
+      setError(data.fallbackUsed ? data.message ?? 'Showing fallback estimate.' : null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong while analyzing your food.';
-      const fallbackInput = textInput.trim() || 'food from image';
-      setResult(getFallbackAnalysis(selectedGoal, fallbackInput));
-      setError(`Live AI analysis failed (${message}). Showing fallback estimate.`);
+      setError(message);
     } finally {
       setLoading(false);
     }
